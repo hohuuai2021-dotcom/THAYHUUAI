@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<title>🤖 Thầy HUUAI – Đồng hành cùng các em</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui;background:#f5f7fb;height:100vh;display:flex}
+#sidebar{
+  width:260px;background:#0f172a;color:#fff;padding:12px;
+  display:flex;flex-direction:column
+}
+#sidebar h3{margin:6px 0 10px;font-size:16px}
+#sidebar input,#sidebar select, #sidebar button{
+  width:100%;margin:6px 0;padding:8px;border-radius:8px;border:none
+}
+#sidebar button{background:#2563eb;color:#fff;font-weight:600}
+#main{flex:1;display:flex;flex-direction:column}
+#chat{
+  flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column
+}
+.msg{max-width:75%;padding:10px 14px;border-radius:14px;margin:6px 0;white-space:pre-wrap}
+.user{background:#2563eb;color:#fff;align-self:flex-end}
+.bot{background:#fff;border:1px solid #e5e7eb}
+.quizBox{
+  background:#fff;border:1px solid #ddd;border-radius:14px;
+  padding:12px;margin:8px 0
+}
+.quizBox button{
+  width:100%;margin:5px 0;padding:8px;border-radius:8px;border:1px solid #ccc;
+  background:#f9fafb
+}
+#inputBar{
+  display:flex;padding:10px;border-top:1px solid #ddd;background:#fff
+}
+#inputBar input{
+  flex:1;padding:12px;border-radius:10px;border:1px solid #ccc
+}
+#inputBar button{
+  margin-left:8px;padding:12px 18px;border:none;border-radius:10px;
+  background:#2563eb;color:#fff;font-weight:600
+}
+@media(max-width:768px){
+  #sidebar{width:200px}
+}
+</style>
+</head>
+
+<body>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <h3>👨‍🏫 Thầy HUUAI</h3>
+  <input id="ten" placeholder="Họ và tên">
+  <input id="lop" placeholder="Lớp (7.1 / 7.2)">
+  <select id="chuong">
+    <option value="Nguyên tử">Chương: Nguyên tử</option>
+    <option value="Phân tử">Chương: Phân tử</option>
+  </select>
+  <button onclick="batQuiz()">📝 Làm quiz chương</button>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="chat"></div>
+
+  <div id="inputBar">
+    <input id="cauhoi" placeholder="Hỏi bài học, dặn dò, lịch học hoặc gõ: làm quiz…" />
+    <button onclick="gui()">Gửi</button>
+  </div>
+</div>
+
+<script>
+const chat = document.getElementById("chat");
+const cauhoi = document.getElementById("cauhoi");
+
+cauhoi.addEventListener("keydown",e=>{if(e.key==="Enter")gui()});
+
+function thongTin(){
+  return {
+    ten: document.getElementById("ten").value || "Học sinh",
+    lop: document.getElementById("lop").value || "7.1",
+    chuong: document.getElementById("chuong").value
+  }
+}
+
+function them(text, cls){
+  const d=document.createElement("div");
+  d.className="msg "+cls;
+  d.innerText=text;
+  chat.appendChild(d);
+  chat.scrollTop=chat.scrollHeight;
+}
+
+function gui(){
+  const {ten,lop}=thongTin();
+  const q=cauhoi.value.trim();
+  if(!q) return;
+  them(`${ten} (${lop}): ${q}`,"user");
+  cauhoi.value="";
+  fetch("/chat",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ten,lop,cauhoi:q})
+  })
+  .then(r=>r.json())
+  .then(d=>them(d.traloi,"bot"));
+}
+
+function batQuiz(){
+  const {ten,lop,chuong}=thongTin();
+  fetch("/quiz/start",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ten,lop,chuong})
+  })
+  .then(r=>r.json())
+  .then(d=>hienCauQuiz(d.q));
+}
+
+function hienCauQuiz(q){
+  const box=document.createElement("div");
+  box.className="quizBox";
+  let html=`<b>${q.cau}</b><br/>`;
+  if(!q.tuLuan){
+    ["A","B","C","D"].forEach(k=>{
+      html+=`<button onclick="traLoi('${k}')">${k}. ${q[k]}</button>`;
+    });
+  }else{
+    html+=`<textarea id="tl" placeholder="Trả lời ngắn..." style="width:100%;margin-top:6px"></textarea>
+    <button onclick="traLoi(null)">Gửi trả lời</button>`;
+  }
+  box.innerHTML=html;
+  chat.appendChild(box);
+  chat.scrollTop=chat.scrollHeight;
+}
+
+function traLoi(chon){
+  const {ten,lop,chuong}=thongTin();
+  const traLoiTuLuan=document.getElementById("tl")?.value||"";
+  fetch("/quiz/answer",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ten,lop,chuong,chon,traLoiTuLuan})
+  })
+  .then(r=>r.json())
+  .then(d=>{
+    if(d.ketThuc){
+      them(d.thongBao,"bot");
+    }else{
+      if(d.giaiThich) them(d.giaiThich,"bot");
+      hienCauQuiz(d.q);
+    }
+  });
+}
+</script>
+
+</body>
+</html>
